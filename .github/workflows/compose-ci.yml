@@ -1,62 +1,41 @@
-name: Compose integration test
+name: Docker Compose CI
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:
 
 jobs:
-  compose-test:
+  build:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
-      - name: Install Docker Compose plugin manually
-        run: |
-          mkdir -p ~/.docker/cli-plugins/
-          curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
-            -o ~/.docker/cli-plugins/docker-compose
-          chmod +x ~/.docker/cli-plugins/docker-compose
-          docker compose version
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build images (if docker-compose uses build:)
-        run: |
-          docker compose build
-
       - name: Start services
         run: |
           docker compose up -d
-          sleep 5
+          sleep 15
 
-      - name: Wait for web service to be healthy and curl /
+      - name: Wait for web service
         run: |
-          for i in {1..15}; do
+          for i in {1..30}; do
             echo "Attempt $i: testing http://localhost:5000/"
             if curl -fsS http://localhost:5000/; then
-              echo "OK - web responded"
+              echo "Web responded OK"
               break
             fi
             sleep 2
           done
 
-      - name: Test DB endpoint
-        run: |
-          if curl -fsS http://localhost:5000/db; then
-            echo "DB endpoint OK"
-          else
-            echo "DB endpoint failed" && docker compose logs --no-color && exit 1
-          fi
+      - name: Test DB connection via Flask
+        run: curl -fsS http://localhost:5000/db
 
-      - name: Collect logs
+      - name: Debug logs if failed
         if: failure()
         run: docker compose logs --no-color
-
-      - name: Tear down
-        if: always()
-        run: docker compose down --volumes --remove-orphans
