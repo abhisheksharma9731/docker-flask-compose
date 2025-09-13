@@ -1,36 +1,32 @@
 from flask import Flask
-import os
 import psycopg2
+import os
 
 app = Flask(__name__)
 
-# Get DB config from environment variables
-DB_HOST = os.getenv("DB_HOST", "db")
-DB_NAME = os.getenv("POSTGRES_DB", "mydb")
-DB_USER = os.getenv("POSTGRES_USER", "user")
-DB_PASS = os.getenv("POSTGRES_PASSWORD", "password")
-
 @app.route("/")
-def home():
-    return "🚀 Flask + Docker + PostgreSQL demo is running!"
+def hello():
+    return "Hello from Flask with Docker & Postgres!"
 
 @app.route("/db")
-def test_db():
+def db_check():
     try:
         conn = psycopg2.connect(
-            host=DB_HOST,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASS
+            dbname=os.getenv("POSTGRES_DB", "mydb"),
+            user=os.getenv("POSTGRES_USER", "user"),
+            password=os.getenv("POSTGRES_PASSWORD", "password"),
+            host="db",  # service name in docker-compose
+            port=5432
         )
         cur = conn.cursor()
         cur.execute("SELECT version();")
         version = cur.fetchone()
         cur.close()
         conn.close()
-        return f"✅ Connected to PostgreSQL! Version: {version}"
+        return f"Connected to Postgres! Version: {version}"
     except Exception as e:
-        return f"❌ Database connection failed: {e}"
+        return f"DB connection failed: {e}"
 
 if __name__ == "__main__":
+    # must bind to 0.0.0.0 so container exposes it
     app.run(host="0.0.0.0", port=5000)
