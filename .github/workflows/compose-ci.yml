@@ -10,22 +10,23 @@ on:
 jobs:
   compose-test:
     runs-on: ubuntu-latest
-    services: {}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Docker Compose plugin (if not present)
+      - name: Install Docker Compose plugin manually
         run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose-plugin
+          mkdir -p ~/.docker/cli-plugins/
+          curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+            -o ~/.docker/cli-plugins/docker-compose
+          chmod +x ~/.docker/cli-plugins/docker-compose
+          docker compose version
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
       - name: Build images (if docker-compose uses build:)
         run: |
-          # Build images referenced by docker-compose (so 'docker compose up' doesn't need network builds)
           docker compose build
 
       - name: Start services
@@ -33,7 +34,7 @@ jobs:
           docker compose up -d
           sleep 5
 
-      - name: Wait for web service to be healthy and curl / (retry)
+      - name: Wait for web service to be healthy and curl /
         run: |
           for i in {1..15}; do
             echo "Attempt $i: testing http://localhost:5000/"
@@ -46,7 +47,6 @@ jobs:
 
       - name: Test DB endpoint
         run: |
-          # endpoint in your Flask app that tests DB, e.g. /db
           if curl -fsS http://localhost:5000/db; then
             echo "DB endpoint OK"
           else
